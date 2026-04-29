@@ -697,8 +697,7 @@ function saveAndShare() {
   const pkUrl = base + '?pk_name=' + encodeURIComponent(name) + '&pk_steps=' + steps + '&pk_time=' + elapsed;
   
   // Copy to clipboard
-  const shareText = '🎮 大麦记忆翻牌PK！我用' + steps + '步/' + fmtTime(elapsed) + '完成，你能超越我吗？
-' + pkUrl;
+  const shareText = '🎮 大麦记忆翻牌PK！我用' + steps + '步/' + fmtTime(elapsed) + '完成，你能超越我吗？\n' + pkUrl;
   
   if (navigator.clipboard && navigator.clipboard.writeText) {
     navigator.clipboard.writeText(shareText).then(() => showToast('✅ 链接已复制，粘贴到微信群即可PK！'));
