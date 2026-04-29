@@ -1,4 +1,14 @@
-node_modules/
-.DS_Store
+# Build artifacts (embedded in index.html)
+bg_base64.txt
+cb_base64.txt
+portraits_data.js
+
+# Large files (embedded in index.html)
+bgm.mp3
+card_back.jpg
+game_bg.jpg
+
+# Scripts (not needed for deployment)
 build_game.py
-extract_avatars*.py
+extract_avatars.py
+extract_avatars2.py
