@@ -83,7 +83,7 @@ body::after{
 #gameHeader{
   display:flex; justify-content:space-between; align-items:center;
   width:100%; max-width:460px; padding:6px 12px;
-  font-size:0.8em; color:#c0b0d8;
+  font-size:0.8em; color:#c0b0d8; position:relative;
 }
 #gameHeader .stat{display:flex;flex-direction:column;align-items:center;gap:1px}
 #gameHeader .val{font-size:1.3em;font-weight:bold;color:#e8d0ff}
@@ -96,8 +96,9 @@ body::after{
 }
 .card{
   aspect-ratio:1/1; perspective:600px; cursor:pointer;
-  border-radius:6px;
+  border-radius:6px; position:relative; z-index:1;
 }
+.card.flipped,.card.matched{z-index:10}
 .card-inner{
   width:100%;height:100%;position:relative;
   transform-style:preserve-3d; transition:transform 0.4s ease;
@@ -304,6 +305,7 @@ body::after{
     <div class="stat"><span class="val" id="stepsVal">0</span><span>步</span></div>
     <div id="gameTitle">✦ 大麦记忆 ✦</div>
     <div class="stat"><span class="val" id="timerVal">0:00</span><span>时间</span></div>
+    <button id="bgmBtn" onclick="toggleBGM()" style="position:absolute;right:8px;top:8px;background:none;border:1px solid rgba(168,85,247,0.4);border-radius:50%;width:30px;height:30px;font-size:14px;cursor:pointer;color:#e8d0ff;z-index:20" title="关闭音乐">🎵</button>
   </div>
   <div id="cardGrid"></div>
 </div>
@@ -353,6 +355,75 @@ function sfxWin(){
   [523,659,784,1047].forEach((f,i)=>setTimeout(()=>playTone(f,0.3,'sine',0.12),i*150));
 }
 
+// ===== BACKGROUND MUSIC (procedural happy loop) =====
+let bgmPlaying=false, bgmTimer=null, bgmGain=null;
+const BGM_BPM=120, BGM_BEAT=60/BGM_BPM;
+// Happy pentatonic melody (C major pentatonic)
+const BGM_MELODY=[
+  523,587,659,784,880,784,659,587, // bar1
+  523,659,784,1047,880,784,659,523, // bar2
+  784,659,523,587,659,784,880,784, // bar3
+  659,523,587,659,784,659,523,0   // bar4
+];
+const BGM_BASS=[
+  262,0,262,0,330,0,330,0, // bar1
+  196,0,196,0,262,0,262,0, // bar2
+  330,0,330,0,262,0,262,0, // bar3
+  196,0,196,0,262,0,262,0  // bar4
+];
+
+function startBGM(){
+  if(bgmPlaying)return;
+  bgmPlaying=true;
+  if(!audioCtx)initAudio();
+  // Master volume for BGM
+  bgmGain=audioCtx.createGain();
+  bgmGain.gain.value=0.06;
+  bgmGain.connect(audioCtx.destination);
+  let beat=0;
+  function tick(){
+    if(!bgmPlaying)return;
+    const mi=beat%BGM_MELODY.length;
+    const bi=beat%BGM_BASS.length;
+    // Melody note
+    const mNote=BGM_MELODY[mi];
+    if(mNote>0){
+      try{
+        const o=audioCtx.createOscillator(),g=audioCtx.createGain();
+        o.type='triangle';o.frequency.value=mNote;
+        g.gain.value=0.3;
+        g.gain.exponentialRampToValueAtTime(0.01,audioCtx.currentTime+BGM_BEAT*0.8);
+        o.connect(g);g.connect(bgmGain);o.start();o.stop(audioCtx.currentTime+BGM_BEAT*0.9);
+      }catch(e){}
+    }
+    // Bass note
+    const bNote=BGM_BASS[bi];
+    if(bNote>0){
+      try{
+        const o=audioCtx.createOscillator(),g=audioCtx.createGain();
+        o.type='sine';o.frequency.value=bNote;
+        g.gain.value=0.4;
+        g.gain.exponentialRampToValueAtTime(0.01,audioCtx.currentTime+BGM_BEAT*0.7);
+        o.connect(g);g.connect(bgmGain);o.start();o.stop(audioCtx.currentTime+BGM_BEAT*0.8);
+      }catch(e){}
+    }
+    beat++;
+    bgmTimer=setTimeout(tick,BGM_BEAT*1000);
+  }
+  tick();
+}
+
+function stopBGM(){
+  bgmPlaying=false;
+  if(bgmTimer){clearTimeout(bgmTimer);bgmTimer=null}
+}
+
+function toggleBGM(){
+  const btn=document.getElementById('bgmBtn');
+  if(bgmPlaying){stopBGM();btn.textContent='🔇';btn.title='开启音乐'}
+  else{startBGM();btn.textContent='🎵';btn.title='关闭音乐'}
+}
+
 // ===== PARTICLES =====
 function spawnParticles(card){
   const r=card.getBoundingClientRect();
@@ -396,6 +467,7 @@ function startGame(){
   document.getElementById('gameScreen').style.display='flex';
   checkPK();
   resetGame();
+  startBGM();
 }
 
 function resetGame(){
@@ -486,6 +558,7 @@ function startTimer(){
 
 function gameWon(){
   clearInterval(timer);
+  stopBGM();
   sfxWin();
   spawnConfetti();
   
@@ -575,6 +648,7 @@ function showToast(msg){
 function restartGame(){
   document.getElementById('resultModal').style.display='none';
   resetGame();
+  startBGM();
 }
 
 function goHome(){
@@ -582,6 +656,7 @@ function goHome(){
   document.getElementById('gameScreen').style.display='none';
   document.getElementById('startScreen').style.display='flex';
   clearInterval(timer);
+  stopBGM();
 }
 
 // Start button
