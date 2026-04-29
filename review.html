@@ -1,0 +1,27 @@
+<!DOCTYPE html>
+<html>
+<head><title>Avatar Review</title></head>
+<body style="display:flex;flex-wrap:wrap;gap:8px;padding:20px;background:#111">
+</body>
+<script>
+const avatars = [];
+// Load from the game's index.html
+fetch('https://michaeldddjh.github.io/memory-game/').then(r=>r.text()).then(html=>{
+  const matches = html.match(/data:image\/jpeg;base64,[A-Za-z0-9+/=]+/g);
+  if(!matches) { document.body.innerHTML='No avatars found'; return; }
+  matches.forEach((src,i)=>{
+    const div = document.createElement('div');
+    div.style.cssText = 'width:200px;text-align:center';
+    const img = document.createElement('img');
+    img.src = src;
+    img.style.cssText = 'width:200px;height:200px;object-fit:cover;border:2px solid #fff';
+    const label = document.createElement('div');
+    label.style.cssText = 'color:#fff;font-size:14px;margin-top:4px';
+    label.textContent = `Avatar #${i}`;
+    div.appendChild(img);
+    div.appendChild(label);
+    document.body.appendChild(div);
+  });
+});
+</script>
+</html>
