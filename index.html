@@ -412,15 +412,15 @@ const pkSteps = parseInt(urlParams.get('pk_steps')) || 0;
 const pkTime = parseFloat(urlParams.get('pk_time')) || 0;
 const isPK = pkName && pkSteps > 0;
 
-if (isPK) {
-  document.getElementById('pkBanner').classList.add('show');
-  document.getElementById('pkName').textContent = decodeURIComponent(pkName);
-  document.getElementById('pkSteps').textContent = pkSteps;
-  document.getElementById('pkTime').textContent = fmtTime(pkTime);
-}
-
 // ===== INIT =====
 window.addEventListener('DOMContentLoaded', () => {
+  // PK banner setup (moved here: DOM must be ready, fmtTime must be defined)
+  if (isPK) {
+    document.getElementById('pkBanner').classList.add('show');
+    document.getElementById('pkName').textContent = decodeURIComponent(pkName);
+    document.getElementById('pkSteps').textContent = pkSteps;
+    document.getElementById('pkTime').textContent = fmtTime(pkTime);
+  }
   createStars();
   buildGrid();
   if (isPK) {
