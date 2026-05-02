@@ -247,6 +247,11 @@ body{
 .lb-cols{display:flex;gap:8px;overflow-x:auto}
 .lb-col{flex:1;min-width:150px}
 .lb-title{color:var(--accent);font-size:.8em;font-weight:bold;margin:4px 0}
+.lb-tabs{display:flex;gap:4px;flex-wrap:wrap;margin-bottom:8px;justify-content:center}
+.lb-tab{background:rgba(255,255,255,.08);border:1px solid rgba(255,255,255,.12);color:rgba(255,255,255,.6);border-radius:12px;padding:3px 10px;font-size:.7em;cursor:pointer;transition:all .2s}
+.lb-tab:hover{background:rgba(255,255,255,.15);color:#fff}
+.lb-tab.active{background:var(--accent);color:#000;border-color:var(--accent);font-weight:bold}
+.lb-spinner{display:inline-block;width:14px;height:14px;border:2px solid rgba(255,255,255,.2);border-top-color:var(--accent);border-radius:50%;animation:spin .8s linear infinite;vertical-align:middle}
 
 /* Win modal extras */
 .result-grid{
@@ -452,7 +457,7 @@ body{
 <!-- Leaderboard Modal -->
 <div id="lbModal" class="modal">
   <div class="modal-box">
-    <h2>🏆 排行榜</h2>
+    <h2>🏆 全球排行榜</h2>
     <div id="lbContent"></div>
     <button class="btn" style="width:100%;margin-top:12px" onclick="closeLb()">关闭</button>
   </div>
@@ -770,7 +775,7 @@ function gameWon() {
       : '💪 继续加油！' + decodeURIComponent(pkName) + ' 用了 ' + pkSteps + ' 步';
   }
 
-  document.getElementById('winLeaderboard').innerHTML = renderLeaderboard(true);
+  loadAndRenderLB('winLeaderboard', true);
   setTimeout(function() {
     document.getElementById('winModal').classList.add('show');
   }, 600);
@@ -789,16 +794,61 @@ function closeWin() {
   document.getElementById('winModal').classList.remove('show');
 }
 
-// ===== LEADERBOARD =====
+// ===== LEADERBOARD (Supabase Remote) =====
+var SB_URL = 'https://oeyieqhiosvgefhkyrlv.supabase.co/rest/v1';
+var SB_KEY = 'sb_publishable_oDndPkqdWgBtnSNNcbCMHA_mx78o8u0';
+var lbCurrentTab = 'all'; // 'all','4x4','4x6','4x8','5x6','5x8'
+var lbCached = null; // cache fetched data
+
+function sbHeaders() {
+  return {
+    'apikey': SB_KEY,
+    'Authorization': 'Bearer ' + SB_KEY,
+    'Content-Type': 'application/json',
+    'Prefer': 'return=representation'
+  };
+}
+
+// Fetch leaderboard from Supabase
+function fetchRemoteLB(diff, limit) {
+  limit = limit || 20;
+  var url = SB_URL + '/leaderboard?select=name,steps,time,difficulty,rating,created_at&order=steps.asc,time.asc&limit=' + limit;
+  if (diff && diff !== 'all') {
+    url += '&difficulty=eq.' + diff;
+  }
+  return fetch(url, { headers: sbHeaders() })
+    .then(function(r) { return r.json(); })
+    .catch(function() { return []; });
+}
+
+// Save to Supabase (async, non-blocking)
+function saveToRemoteLB(name, s, t) {
+  var diffLabel = DIFFICULTIES[selectedDiff] ? (selectedDiff.replace('x','×')) : '5×8';
+  var rating = getRating(s).letter;
+  // Save to Supabase
+  fetch(SB_URL + '/leaderboard', {
+    method: 'POST',
+    headers: sbHeaders(),
+    body: JSON.stringify({ name: name, steps: s, time: t, difficulty: selectedDiff, rating: rating })
+  }).catch(function(err) {
+    console.warn('Supabase save failed, using localStorage fallback', err);
+    // Fallback: save to localStorage
+    saveToLocalLB(name, s, t);
+  });
+  // Also save locally as backup
+  saveToLocalLB(name, s, t);
+}
+
+// Local fallback
 function getLB() {
   try { return JSON.parse(localStorage.getItem('dm_lb') || '{"steps":[],"time":[]}'); }
   catch(e) { return {"steps":[],"time":[]}; }
 }
 
-function saveToLB(name, s, t) {
+function saveToLocalLB(name, s, t) {
   var lb = getLB();
   var diffLabel = DIFFICULTIES[selectedDiff] ? (selectedDiff.replace('x','×')) : '5×8';
-  var entry = {name: name, steps: s, time: t, diff: diffLabel, date: new Date().toLocaleDateString('zh-CN')};
+  var entry = {name: name, steps: s, time: t, diff: diffLabel, difficulty: selectedDiff, date: new Date().toLocaleDateString('zh-CN')};
   lb.steps.push(entry);
   lb.steps.sort(function(a,b){ return a.steps - b.steps || a.time - b.time; });
   lb.steps = lb.steps.slice(0, 10);
@@ -808,32 +858,105 @@ function saveToLB(name, s, t) {
   localStorage.setItem('dm_lb', JSON.stringify(lb));
 }
 
-function renderLeaderboard(isWin) {
-  var lb = getLB();
-  if (lb.steps.length === 0 && lb.time.length === 0) {
-    return '<div style="text-align:center;color:rgba(255,255,255,.3);font-size:.8em;padding:12px">暂无记录，等你来创造！</div>';
+// Render difficulty tabs
+function renderLbTabs() {
+  var tabs = [
+    {key:'all', label:'🏅 全部'},
+    {key:'4x4', label:'4×4'},
+    {key:'4x6', label:'4×6'},
+    {key:'4x8', label:'4×8'},
+    {key:'5x6', label:'5×6'},
+    {key:'5x8', label:'5×8'}
+  ];
+  var html = '<div class="lb-tabs">';
+  tabs.forEach(function(t) {
+    var cls = 'lb-tab' + (lbCurrentTab === t.key ? ' active' : '');
+    html += '<button class="' + cls + '" onclick="switchLbTab(\'' + t.key + '\')">' + t.label + '</button>';
+  });
+  html += '</div>';
+  return html;
+}
+
+// Render leaderboard from data array
+function renderLbFromData(data, isWin) {
+  if (!data || data.length === 0) {
+    return '<div style="text-align:center;color:rgba(255,255,255,.3);font-size:.8em;padding:12px">暂无记录，等你来创造！🏆</div>';
   }
+  // Separate by steps sort and time sort (data is already sorted by steps,time)
+  var stepsData = data.slice(0, 20);
+  var timeData = data.slice().sort(function(a,b){ return a.time - b.time || a.steps - b.steps; }).slice(0, 20);
+
   var html = '<div class="lb-cols">';
-  html += '<div class="lb-col"><div class="lb-title">👣 最少步数 TOP10</div>';
+  html += '<div class="lb-col"><div class="lb-title">👣 最少步数 TOP20</div>';
   html += '<table class="lb-table"><tr><th>#</th><th>昵称</th><th>难度</th><th>步数</th><th>时间</th></tr>';
-  lb.steps.forEach(function(e, i) {
+  stepsData.forEach(function(e, i) {
     var hl = (isWin && e.steps === steps && e.time === elapsed) ? ' class="me"' : '';
-    html += '<tr' + hl + '><td>' + (i+1) + '</td><td>' + e.name + '</td><td>' + (e.diff||'—') + '</td><td>' + e.steps + '</td><td>' + fmtTime(e.time) + '</td></tr>';
+    var diff = (e.difficulty || '5x8').replace('x','×');
+    html += '<tr' + hl + '><td>' + (i+1) + '</td><td>' + e.name + '</td><td>' + diff + '</td><td>' + e.steps + '</td><td>' + fmtTime(e.time) + '</td></tr>';
   });
   html += '</table></div>';
-  html += '<div class="lb-col"><div class="lb-title">⏱️ 最快时间 TOP10</div>';
+  html += '<div class="lb-col"><div class="lb-title">⏱️ 最快时间 TOP20</div>';
   html += '<table class="lb-table"><tr><th>#</th><th>昵称</th><th>难度</th><th>时间</th><th>步数</th></tr>';
-  lb.time.forEach(function(e, i) {
+  timeData.forEach(function(e, i) {
     var hl = (isWin && e.steps === steps && e.time === elapsed) ? ' class="me"' : '';
-    html += '<tr' + hl + '><td>' + (i+1) + '</td><td>' + e.name + '</td><td>' + (e.diff||'—') + '</td><td>' + fmtTime(e.time) + '</td><td>' + e.steps + '</td></tr>';
+    var diff = (e.difficulty || '5x8').replace('x','×');
+    html += '<tr' + hl + '><td>' + (i+1) + '</td><td>' + e.name + '</td><td>' + diff + '</td><td>' + fmtTime(e.time) + '</td><td>' + e.steps + '</td></tr>';
   });
   html += '</table></div></div>';
   return html;
 }
 
+// Render leaderboard (sync wrapper for win modal)
+function renderLeaderboard(isWin) {
+  // If we have cached remote data, use it
+  if (lbCached && lbCached.length > 0) {
+    var filtered = lbCurrentTab === 'all' ? lbCached : lbCached.filter(function(e) { return e.difficulty === lbCurrentTab; });
+    return renderLbTabs() + renderLbFromData(filtered, isWin);
+  }
+  // Fallback to local
+  var lb = getLB();
+  if (lb.steps.length === 0 && lb.time.length === 0) {
+    return renderLbTabs() + '<div style="text-align:center;color:rgba(255,255,255,.3);font-size:.8em;padding:12px">暂无记录，等你来创造！🏆</div>';
+  }
+  // Convert local format to remote-like format
+  var localData = lb.steps.map(function(e) {
+    return { name: e.name, steps: e.steps, time: e.time, difficulty: e.difficulty || (e.diff||'5x8').replace('×','x'), rating: '' };
+  });
+  return renderLbTabs() + renderLbFromData(localData, isWin);
+}
+
+// Async: fetch from Supabase and render
+function loadAndRenderLB(containerId, isWin) {
+  var el = document.getElementById(containerId);
+  if (!el) return;
+  el.innerHTML = renderLbTabs() + '<div style="text-align:center;padding:16px;color:rgba(255,255,255,.4)"><span class="lb-spinner"></span> 加载全球排行榜中...</div>';
+
+  fetchRemoteLB('all', 100).then(function(data) {
+    lbCached = data;
+    var filtered = lbCurrentTab === 'all' ? data : data.filter(function(e) { return e.difficulty === lbCurrentTab; });
+    el.innerHTML = renderLbTabs() + renderLbFromData(filtered, isWin);
+  }).catch(function() {
+    // Fallback to local
+    el.innerHTML = renderLeaderboard(isWin);
+  });
+}
+
+// Switch difficulty tab
+function switchLbTab(tab) {
+  lbCurrentTab = tab;
+  // Re-render whichever container is visible
+  var lbContent = document.getElementById('lbContent');
+  var winLb = document.getElementById('winLeaderboard');
+  if (document.getElementById('lbModal').classList.contains('show') && lbContent) {
+    loadAndRenderLB('lbContent', false);
+  } else if (winLb) {
+    loadAndRenderLB('winLeaderboard', true);
+  }
+}
+
 function showLeaderboard() {
-  document.getElementById('lbContent').innerHTML = renderLeaderboard(false);
   document.getElementById('lbModal').classList.add('show');
+  loadAndRenderLB('lbContent', false);
 }
 
 function closeLb() {
@@ -842,7 +965,7 @@ function closeLb() {
 
 function saveAndShare() {
   var name = document.getElementById('nameInput').value.trim() || '大麦侠';
-  saveToLB(name, steps, elapsed);
+  saveToRemoteLB(name, steps, elapsed);
 
   var base = window.location.origin + window.location.pathname;
   var diffLabel = DIFFICULTIES[selectedDiff] ? (selectedDiff.replace('x','×')) : '5×8';
@@ -861,7 +984,7 @@ function saveAndShare() {
     document.body.removeChild(ta);
     showToast('✅ 链接已复制，粘贴到微信群即可PK！');
   }
-  document.getElementById('winLeaderboard').innerHTML = renderLeaderboard(true);
+  loadAndRenderLB('winLeaderboard', true);
 }
 
 // ===== AUDIO (Web Audio API - no external files needed) =====
