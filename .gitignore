@@ -1,14 +1,16 @@
-# Build artifacts (embedded in index.html)
-bg_base64.txt
-cb_base64.txt
-portraits_data.js
-
-# Large files (embedded in index.html)
-bgm.mp3
-card_back.jpg
-game_bg.jpg
-
-# Scripts (not needed for deployment)
-build_game.py
-extract_avatars.py
-extract_avatars2.py
+.DS_Store
+__pycache__/
+*.pyc
+_avatars_new.js
+extract_*.py
+generate_review_page.py
+preview_gen.py
+portrait_best/
+portrait_candidates/
+portrait_extraction/
+portraits_extracted/
+portraits_db/
+preview_portraits.html
+review_portraits.html
+review_portraits_inline.html
+portrait_review.html
