@@ -419,7 +419,7 @@ body{
 <div id="stats" class="stats">
   <div class="stat"><div class="label">👣 步数</div><div class="val" id="stepsVal">0</div></div>
   <div class="stat"><div class="label">⏱️ 时间</div><div class="val" id="timeVal">0:00</div></div>
-  <div class="stat"><div class="label">🎯 配对</div><div class="val" id="matchVal">0/20</div></div>
+  <div class="stat"><div class="label">🎯 配对</div><div class="val" id="matchVal">0/8</div></div>
 </div>
 
 <!-- Game Grid -->
@@ -468,7 +468,7 @@ body{
   <div class="modal-box">
     <h2>🎯 选择难度</h2>
     <div class="diff-grid">
-      <div class="diff-btn" data-diff="4x4" onclick="selectDiff(this)">
+      <div class="diff-btn selected" data-diff="4x4" onclick="selectDiff(this)">
         <div class="diff-size">4×4</div>
         <div class="diff-label">轻松入门</div>
         <div class="diff-pairs">8对</div>
@@ -488,7 +488,7 @@ body{
         <div class="diff-label">挑战记忆</div>
         <div class="diff-pairs">15对</div>
       </div>
-      <div class="diff-btn selected" data-diff="5x8" onclick="selectDiff(this)">
+      <div class="diff-btn" data-diff="5x8" onclick="selectDiff(this)">
         <div class="diff-size">5×8</div>
         <div class="diff-label">地狱模式</div>
         <div class="diff-pairs">20对</div>
@@ -535,10 +535,10 @@ const DIFFICULTIES = {
   '5x6': {cols:5, rows:6, pairs:15},
   '5x8': {cols:5, rows:8, pairs:20}
 };
-let PAIRS = 20;
-let COLS = 5;
-let ROWS = 8;
-let selectedDiff = '5x8';
+let PAIRS = 8;
+let COLS = 4;
+let ROWS = 4;
+let selectedDiff = '4x4';
 
 // ===== STATE =====
 let cards = [];
