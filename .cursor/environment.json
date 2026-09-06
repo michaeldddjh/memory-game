@@ -1,0 +1,16 @@
+{
+  "name": "记忆翻牌PK Memory Game",
+  "ports": [
+    {
+      "name": "static server",
+      "port": 8080
+    }
+  ],
+  "terminals": [
+    {
+      "name": "static-server",
+      "command": "python3 -m http.server 8080",
+      "description": "Serves the static memory-game site (index.html) at http://localhost:8080. This is a pure front-end project with no build step or dependencies."
+    }
+  ]
+}
